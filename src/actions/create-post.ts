@@ -30,6 +30,10 @@ export async function createPost(
   if (!result.success) {
     return { errors: result.error.flatten().fieldErrors };
   }
+  const session = await auth();
+  if (!session || !session.user) {
+    return { errors: { _form: ["You muse be signed in to do this"] } };
+  }
   return { errors: {} };
   // TODO: revalidate topic show page
 }
