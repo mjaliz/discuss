@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/db";
+import paths from "@/paths";
 
 const createPostSchema = z.object({
   title: z.string().min(3),
@@ -19,6 +20,7 @@ interface CreatePostFormState {
   };
 }
 export async function createPost(
+  slug: string,
   formState: CreatePostFormState,
   formData: FormData
 ): Promise<CreatePostFormState> {
@@ -34,6 +36,35 @@ export async function createPost(
   if (!session || !session.user) {
     return { errors: { _form: ["You muse be signed in to do this"] } };
   }
-  return { errors: {} };
-  // TODO: revalidate topic show page
+
+  const topic = await db.topic.findFirst({
+    where: { slug },
+  });
+
+  if (!topic) {
+    return {
+      errors: {
+        _form: ["Cannot find topi"],
+      },
+    };
+  }
+
+  let post: Post;
+  try {
+    post = await db.post.create({
+      data: {
+        title: result.data.title,
+        content: result.data.content,
+        userId: session.user.id,
+        topicId: topic.id,
+      },
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      return { errors: { _form: [err.message] } };
+    }
+    return { errors: { _form: ["Failed to save post"] } };
+  }
+  revalidatePath(paths.topicShow(slug));
+  redirect(paths.postShow(slug, post.id));
 }
